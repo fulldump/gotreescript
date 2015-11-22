@@ -6,6 +6,7 @@ const (
 	TEXT TokenType = iota
 	TAG
 	COMMENT
+	NOPARSE
 )
 
 type Token struct {
@@ -33,6 +34,7 @@ func (this *Token) PrettyPrint() string {
 		TEXT:    "TEXT",
 		TAG:     "TAG",
 		COMMENT: "COMMENT",
+		NOPARSE: "NOPARSE",
 	}
 
 	pp := ""

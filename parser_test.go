@@ -658,7 +658,7 @@ func Test_multibyte(t *testing.T) {
 	reference := &[]*Token{
 		&Token{
 			Type:    TEXT,
-			Partial: " ú ",
+			Partial: ` ú `,
 		},
 		&Token{
 			Type:    TAG,
@@ -669,7 +669,115 @@ func Test_multibyte(t *testing.T) {
 		},
 		&Token{
 			Type:    TEXT,
-			Partial: " € ",
+			Partial: ` € `,
+		},
+	}
+
+	check(t, code, reference)
+}
+
+func Test_noparse_1(t *testing.T) {
+
+	code := ` a [[NAME1]] b [[Noparse]] c [[NAME2]] d `
+
+	reference := &[]*Token{
+		&Token{
+			Type:    TEXT,
+			Partial: ` a `,
+		},
+		&Token{
+			Type:    TAG,
+			Partial: `[[NAME1]]`,
+			Name:    "NAME1",
+			Flags:   []string{},
+			Args:    map[string]string{},
+		},
+		&Token{
+			Type:    TEXT,
+			Partial: ` b `,
+		},
+		&Token{
+			Type:    NOPARSE,
+			Partial: `[[Noparse]]`,
+			Name:    "Noparse",
+			Flags:   []string{},
+			Args:    map[string]string{},
+		},
+		&Token{
+			Type:    TEXT,
+			Partial: ` c [[NAME2]] d `,
+		},
+	}
+
+	check(t, code, reference)
+}
+
+func Test_noparse_2(t *testing.T) {
+
+	code := ` a [[NAME1]] b [[noparse a:b]] c [[NAME2]] d `
+
+	reference := &[]*Token{
+		&Token{
+			Type:    TEXT,
+			Partial: ` a `,
+		},
+		&Token{
+			Type:    TAG,
+			Partial: `[[NAME1]]`,
+			Name:    "NAME1",
+			Flags:   []string{},
+			Args:    map[string]string{},
+		},
+		&Token{
+			Type:    TEXT,
+			Partial: ` b `,
+		},
+		&Token{
+			Type:    NOPARSE,
+			Partial: `[[noparse a:b]]`,
+			Name:    "noparse",
+			Flags:   []string{},
+			Args:    map[string]string{"a": "b"},
+		},
+		&Token{
+			Type:    TEXT,
+			Partial: ` c [[NAME2]] d `,
+		},
+	}
+
+	check(t, code, reference)
+}
+
+func Test_noparse_3(t *testing.T) {
+
+	code := ` a [[NAME1]] b [[noparse a:b c]] c [[NAME2]] d `
+
+	reference := &[]*Token{
+		&Token{
+			Type:    TEXT,
+			Partial: ` a `,
+		},
+		&Token{
+			Type:    TAG,
+			Partial: `[[NAME1]]`,
+			Name:    "NAME1",
+			Flags:   []string{},
+			Args:    map[string]string{},
+		},
+		&Token{
+			Type:    TEXT,
+			Partial: ` b `,
+		},
+		&Token{
+			Type:    NOPARSE,
+			Partial: `[[noparse a:b c]]`,
+			Name:    "noparse",
+			Flags:   []string{"c"},
+			Args:    map[string]string{"a": "b"},
+		},
+		&Token{
+			Type:    TEXT,
+			Partial: ` c [[NAME2]] d `,
 		},
 	}
 

@@ -1,5 +1,7 @@
 package gotreescript
 
+import "strings"
+
 // Modes
 type ScopeType int
 
@@ -15,6 +17,7 @@ const (
 	SCOPE_VALUE
 	SCOPE_VALUE_SIMPLE_QUOTED
 	SCOPE_VALUE_DOUBLE_QUOTED
+	SCOPE_NOPARSE
 )
 
 type Parser struct {
@@ -39,16 +42,21 @@ func (this *Parser) Parse(code string) *[]*Token {
 	this.token = &Token{}
 	this.tokens = []*Token{}
 
+	buffer := []int32{}
+	for _, r := range code {
+		buffer = append(buffer, r)
+	}
+
 	attribute := ""
 	value := ""
 
-	n := len(code)
+	n := len(buffer) //utf8.RuneCount(buffer)
 
 	for i := 0; i < n; i++ {
-		c := string(code[i])
+		c := string(buffer[i])
 		cc := c
 		if i+1 < n {
-			cc += string(code[i+1])
+			cc += string(buffer[i+1])
 		}
 
 		switch this.scope {
@@ -57,16 +65,16 @@ func (this *Parser) Parse(code string) *[]*Token {
 
 			if "[[" == cc {
 				i++
+				this.scope = SCOPE_TAG_START
 				this.add_token()
 				this.token.Partial = "[["
-				this.scope = SCOPE_TAG_START
 			} else {
 				this.token.Partial += c
 			}
 
 		case SCOPE_TAG_START:
 
-			if " " == c || "\n" == c || "\t" == c {
+			if is_blank(c) {
 				this.token.Partial += c
 				this.token.Type = COMMENT
 				this.scope = SCOPE_COMMENT
@@ -75,8 +83,8 @@ func (this *Parser) Parse(code string) *[]*Token {
 				this.token.Partial += cc
 				this.token.Type = COMMENT
 				this.scope = SCOPE_COMMENT
-				this.add_token()
 				this.scope = SCOPE_TEXT
+				this.add_token()
 			} else {
 				this.token.Type = TAG
 				this.token.Name += c
@@ -91,8 +99,8 @@ func (this *Parser) Parse(code string) *[]*Token {
 			if "]]" == cc {
 				i++
 				this.token.Partial += cc
-				this.add_token()
 				this.scope = SCOPE_TEXT
+				this.add_token()
 			} else {
 				this.token.Partial += c
 			}
@@ -102,9 +110,9 @@ func (this *Parser) Parse(code string) *[]*Token {
 			if "]]" == cc {
 				i++
 				this.token.Partial += "]]"
-				this.add_token()
 				this.scope = SCOPE_TEXT
-			} else if " " == c || "\n" == c || "\t" == c {
+				this.add_token()
+			} else if is_blank(c) {
 				this.token.Partial += c
 				this.scope = SCOPE_ATTRIBUTE_START
 			} else {
@@ -120,9 +128,9 @@ func (this *Parser) Parse(code string) *[]*Token {
 			if "]]" == cc {
 				i++
 				this.token.Partial += "]]"
-				this.add_token()
 				this.scope = SCOPE_TEXT
-			} else if " " == c || "\n" == c || "\t" == c {
+				this.add_token()
+			} else if is_blank(c) {
 				this.token.Partial += c
 			} else {
 				this.token.Partial += c
@@ -142,13 +150,13 @@ func (this *Parser) Parse(code string) *[]*Token {
 				i++
 				this.token.Partial += "]]"
 				this.token.Flags = append(this.token.Flags, attribute)
-				this.add_token()
 				this.scope = SCOPE_TEXT
-			} else if ":" == c || "=" == c {
+				this.add_token()
+			} else if is_assignment(c) {
 				// Move to look for value :)
 				this.token.Partial += c
 				this.scope = SCOPE_VALUE_START
-			} else if " " == c || "\n" == c || "\t" == c {
+			} else if is_blank(c) {
 				this.token.Partial += c
 				this.scope = SCOPE_ASSIGNMENT
 			} else {
@@ -165,11 +173,11 @@ func (this *Parser) Parse(code string) *[]*Token {
 				i++
 				this.token.Partial += "]]"
 				this.token.Flags = append(this.token.Flags, attribute)
-				this.add_token()
 				this.scope = SCOPE_TEXT
-			} else if " " == c || "\n" == c || "\t" == c {
+				this.add_token()
+			} else if is_blank(c) {
 				this.token.Partial += c
-			} else if ":" == c || "=" == c {
+			} else if is_assignment(c) {
 				// Move to look for value :)
 				this.token.Partial += c
 				this.scope = SCOPE_VALUE_START
@@ -187,9 +195,9 @@ func (this *Parser) Parse(code string) *[]*Token {
 				i++
 				this.token.Partial += "]]"
 				this.token.Args[attribute] = ""
-				this.add_token()
 				this.scope = SCOPE_TEXT
-			} else if " " == c || "\n" == c || "\t" == c {
+				this.add_token()
+			} else if is_blank(c) {
 				this.token.Partial += c
 			} else if "'" == c {
 				this.token.Partial += c
@@ -211,9 +219,9 @@ func (this *Parser) Parse(code string) *[]*Token {
 				i++
 				this.token.Partial += "]]"
 				this.token.Args[attribute] = value
-				this.add_token()
 				this.scope = SCOPE_TEXT
-			} else if " " == c || "\n" == c || "\t" == c {
+				this.add_token()
+			} else if is_blank(c) {
 				this.token.Partial += c
 				this.token.Args[attribute] = value
 				this.scope = SCOPE_ATTRIBUTE_START
@@ -267,16 +275,38 @@ func (this *Parser) Parse(code string) *[]*Token {
 				this.token.Partial += c
 				value += c
 			}
+
+		case SCOPE_NOPARSE:
+
+			this.token.Partial += c
+
 		}
 	}
 	this.add_token()
-
-	_ = value // TODO: remove this line
 
 	return &this.tokens
 }
 
 func (this *Parser) add_token() {
+
 	this.tokens = append(this.tokens, this.token)
-	this.token = &Token{}
+
+	if TAG == this.token.Type && "noparse" == strings.ToLower(this.token.Name) {
+		this.token.Type = NOPARSE
+		this.token = &Token{
+			Type: TEXT,
+		}
+		this.scope = SCOPE_NOPARSE
+	} else {
+		this.token = &Token{}
+	}
+
+}
+
+func is_blank(c string) bool {
+	return " " == c || "\n" == c || "\t" == c
+}
+
+func is_assignment(c string) bool {
+	return ":" == c || "=" == c
 }
