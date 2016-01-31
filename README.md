@@ -1,5 +1,7 @@
 # gotreescript
-<img src="https://api.travis-ci.org/GerardoOscarJT/gotreescript.svg?branch=master">
+<p align="center">
+  <img src="https://api.travis-ci.org/fulldump/gotreescript.svg?branch=master">
+</p>
 
 TreeScript parser for Go
 
